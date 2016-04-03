@@ -1,0 +1,66 @@
+---
+title: "Quality Activity Recognition (QAR) Analysis "
+author: "L. Chin"
+date: "April 1, 2016"
+output: html_document
+---
+
+
+# Overview
+A study was conducted to determine if machine learning could accurately assess the quality of a physical exercise routine.  The study used a group of volunteers to perform a specific weight lifting excercise.  An experienced trainer was used to direct the test subjects so they performed the exercise correctly, and incorrectly in specific ways.
+
+As the volunteer performed the exercise (both correctly and incorrectly), data was collected from sensors located on the subject's belt, arm, forearm, and on the dumbbell.
+
+This analysis will determine if the sensor data can be used to predict the quality of the subject's motion in performing the exercise.  It will determine whether the exercise motion was correct, or if incorrect, to identify the specific mistake in technique.
+
+#Exploratory Analysis of Data
+The training data has 160 columns of data, but not all can be used for prediction.  The 1st 7 columns identify non-sensor related data such as the date the test was made, the name of the volunteer, etc.  The last column "classe" identifies the outcome of the motion (A=correct, B-D identifying specific common mistakes in technique).  Each excercise motion has many sensor samples (rows in the data), conducted in 1 or more numbered windows.  At the end of each window, statistical summaries of the raw sensor data collected during the window are computed (e.g. variance, stddev, max, min, etc.).  These statistical summaries are provided as separate columns in the data, and comprise 100 of the 160 columns of data.
+
+The test data set also has 160 columns where the 1st 7 columns contain non-sensor related data.  The last column is a placeholder "problem id" for the predicted outcome.  Of the remaining columns, only 52 columns contain any data at all.  These 52 columns all contain raw sensor data.  The columns containing variables for computed statistical summaries for each window are all NA.  Hence the only columns that can be considered for prediction are the 52 columns containing raw sensor data.
+
+#Preprocessing Data
+
+The training data is first reduced in size to match the columns that actually contain data in the test data set.  The first 7 columns cannot be used for prediction (they are non-sensor data) and are removed.  Only the 52 columns containing raw sensor data are retained, along with the last column which contains the outcome.  Columnns containing statistical summaries of sensor data for each window are removed since they are all NA in the test data set, and hence cannot be used for prediction.  The training2 variable contains the columns of interest for training.
+
+```{r preprocessing data, cache=TRUE}
+training<-read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv", header=TRUE)
+testing<-read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv", header=TRUE)
+# use the command below to determine which columns contain real data. From printing testing2, you can tell the raw 
+# sensor data columns are the only columns populated.
+testing2<-testing[, colSums(is.na(testing)) != nrow(testing)]
+
+# data from above is used to extract the specific columns we want the algorithm to train on.
+training2<-training[,names(training[,grep("^roll|^pitch|^yaw|^total_accel|^gyros|^magnet|^accel|^class",names(training))])]
+
+```
+
+#Analysis
+## Training A Model
+A model is trained using the random forest method.  This method essentially implements a random sampling of subsets of the training data within the algorithm as it builds each tree in the forest (similar to the effect of cross fold validation).  This simplifies the training somewhat.  The R code to train the model is shown below, along with a summary of the confusion matrix and out of bag error (OOB) estimate.  The OOB error estimate is computed each time a tree in the random forest is created, using the out of bag sample.  This allows you to test the accuracy of the model without requiring a separate set of validation data.  The model appears extremely accurate with the OOB <= .39%.
+
+```{r train using random forest}
+set.seed(2332)
+library(caret)
+model<-train(classe~., method="rf", data=training2)
+```
+
+Below is a summary of the model, including the accuracy and confusion matrix  :
+
+```{r model summary}
+print(model$finalModel)
+```
+
+## Predicting Against the Test Data
+
+To predict against the test set, simply run the predict command using the previous model.
+
+```{r prediction using the model}
+predicted_output<-predict(model,testing)
+```
+
+Below is the predicted output for the test data set:
+
+```{r predicted output}
+print(predicted_output)
+```
+
